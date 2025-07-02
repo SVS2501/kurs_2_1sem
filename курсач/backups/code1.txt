@@ -1,0 +1,134 @@
+from telebot import types
+import telebot
+import sqlite3
+name = None
+token = ''
+bot=telebot.TeleBot(token)
+password = "sosiska24"
+@bot.message_handler(commands=['start'])
+def greetings(message):
+
+    conn = sqlite3.connect('anecdotes.sql')
+    cur = conn.cursor()
+
+    cur.execute('CREATE TABLE IF NOT EXISTS anecdotes (id int auto_increment primary key, jokename varchar , joke varchar)')
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    bot.send_message(message.chat.id,"Привет, я бот, который хранит и рассказывает шутки ")
+    bot.send_message(message.chat.id, "Введите 1 если хотите добавить шутку, 2 если хотите удалить, 3 если хотите просмотреть все шутки")
+    bot.register_next_step_handler(message, choice)
+
+password_checker = False
+def password_check_add_joke(message):
+    global password_checker
+    pswrd = message.text.strip()
+    if pswrd == password:
+        password_checker = True
+        bot.send_message(message.chat.id, "пароль верный, добро пожаловать")
+        bot.send_message(message.chat.id, "Введите название шутки")
+        bot.register_next_step_handler(message, joke_name)
+    else:
+        bot.send_message(message.chat.id, "пароль неверный.")
+
+def password_check_delete_joke(message):
+    global password_checker
+    pswrd = message.text.strip()
+    if pswrd == password:
+        password_checker = True
+        bot.send_message(message.chat.id, "пароль верный, добро пожаловать")
+        bot.send_message(message.chat.id, "Введите название шутки, которую хотите удалить")
+        bot.register_next_step_handler(message, delete_joke)
+    else:
+        bot.send_message(message.chat.id, "пароль неверный.")
+
+def choice(message):
+    variant = message.text.strip()
+    if variant == "1":
+        bot.send_message(message.chat.id,"введите пароль")
+        bot.register_next_step_handler(message,password_check_add_joke)
+    elif variant == "2":
+        bot.send_message(message.chat.id, "введите пароль")
+        bot.register_next_step_handler(message, password_check)
+    elif variant == "3":
+        markup = telebot.types.InlineKeyboardMarkup()
+        markup.add(telebot.types.InlineKeyboardButton('список шуток', callback_data='anecdotes'))
+
+def joke_name(message):
+    global name
+    name = message.text.strip()
+    bot.send_message(message.chat.id, "отправьте шутку одним текстовым сообщением")
+    bot.register_next_step_handler(message, joke_text)
+
+def joke_text(message):
+    joke = message.text.strip()
+
+    conn = sqlite3.connect('anecdotes.sql')
+    cur = conn.cursor()
+
+    cur.execute('INSERT INTO anecdotes (jokename, joke) VALUES ("%s", "%s")'%(name,joke))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.add(telebot.types.InlineKeyboardButton('список шуток', callback_data='anecdotes'))
+    bot.send_message(message.chat.id, "ваша шутка успешно добавлена!",reply_markup=markup)
+
+def delete_joke(message):
+    deleting_name = message.text.strip()
+
+    conn = sqlite3.connect('anecdotes.sql')
+    cur = conn.cursor()
+
+    cur.execute(f"DELETE FROM anecdotes WHERE jokename='{deleting_name}';")
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.add(telebot.types.InlineKeyboardButton('список шуток', callback_data='anecdotes'))
+    bot.send_message(message.chat.id, f"Шутка с названием '{deleting_name}' удалена", reply_markup=markup)
+
+@bot.callback_query_handler(func= lambda call: True)
+def callback(call):
+
+    conn = sqlite3.connect('anecdotes.sql')
+    cur = conn.cursor()
+
+    cur.execute('SELECT * FROM anecdotes')
+    jokenames = cur.fetchall()
+
+    info = ''
+    for el in jokenames:
+        info += f'Имя шутки: {el[1]}, сама шутка: {el[2]}\n'
+    cur.close()
+    conn.close()
+
+    bot.send_message(call.message.chat.id,info)
+
+def joke_add(message):
+    pass
+    """
+    keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    button_pelmen = types.KeyboardButton(text='шутка про пельмень')
+    button_sit = types.KeyboardButton(text='шутка про рыбу')
+    keyboard.add(button_pelmen,button_sit)
+    bot.send_message(message.chat.id, "Выберите категорию шуток", reply_markup=keyboard)
+    """
+
+def pelm(message):
+    bot.send_message(message.chat.id, 'Как называется больщой мёртвый пельмень?Некромант.')
+
+#@bot.message_handler(content_types=['text'])
+def repeat_all_messages(message):
+    pass
+    """
+    if message.text.lower() == 'шутки':
+        menu(message)
+    elif message.text.lower() == 'шутка про пельмень':
+        pelm(message)
+        """
+if __name__=='__main__':
+    bot.infinity_polling()
